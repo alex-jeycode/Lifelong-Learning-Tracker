@@ -265,3 +265,81 @@
     (ok true)
   )
 )
+
+;; #[allow(unchecked_data)]
+(define-public (create-achievement (title (string-ascii 100)) (description (string-ascii 200)) (required-courses uint))
+  (let
+    (
+      (achievement-id (var-get achievement-nonce))
+    )
+    (asserts! (is-eq tx-sender contract-owner) err-unauthorized)
+    (asserts! (and (> (len title) u0) (> required-courses u0)) err-invalid-input)
+    (map-set achievements achievement-id
+      {
+        title: title,
+        description: description,
+        required-courses: required-courses,
+        badge-earned-by: u0
+      }
+    )
+    (var-set achievement-nonce (+ achievement-id u1))
+    (ok achievement-id)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (earn-achievement (achievement-id uint))
+  (let
+    (
+      (achievement (unwrap! (map-get? achievements achievement-id) err-not-found))
+      (stats (get-learner-stats tx-sender))
+    )
+    (asserts! (>= (get total-courses stats) (get required-courses achievement)) err-unauthorized)
+    (asserts! (is-none (map-get? learner-achievements { learner: tx-sender, achievement-id: achievement-id })) err-already-exists)
+    (map-set learner-achievements 
+      { learner: tx-sender, achievement-id: achievement-id }
+      {
+        earned-date: stacks-block-height,
+        verified: true
+      }
+    )
+    (map-set achievements achievement-id
+      (merge achievement { badge-earned-by: (+ (get badge-earned-by achievement) u1) })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (create-learning-path (name (string-ascii 100)) (course-list (list 10 uint)))
+  (let
+    (
+      (path-id (var-get course-nonce))
+    )
+    (asserts! (> (len name) u0) err-invalid-input)
+    (asserts! (> (len course-list) u0) err-invalid-input)
+    (map-set learning-paths path-id
+      {
+        name: name,
+        course-list: course-list,
+        creator: tx-sender
+      }
+    )
+    (ok path-id)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (award-bonus (learner principal) (amount uint))
+  (let
+    (
+      (stats (get-learner-stats learner))
+    )
+    (asserts! (is-eq tx-sender contract-owner) err-unauthorized)
+    (asserts! (> amount u0) err-invalid-input)
+    (map-set learner-stats learner
+      (merge stats { tokens-earned: (+ (get tokens-earned stats) amount) })
+    )
+    (ok true)
+  )
+)
