@@ -148,3 +148,120 @@
     (ok reward-amount)
   )
 )
+
+;; Public functions
+;; #[allow(unchecked_data)]
+(define-public (create-course (name (string-ascii 100)))
+  (let
+    (
+      (course-id (var-get course-nonce))
+    )
+    (asserts! (> (len name) u0) err-invalid-input)
+    (map-set courses course-id
+      {
+        name: name,
+        creator: tx-sender,
+        active: true
+      }
+    )
+    (var-set course-nonce (+ course-id u1))
+    (ok course-id)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (record-completion (course-id uint) (hours-spent uint))
+  (let
+    (
+      (learner tx-sender)
+      (stats (get-learner-stats learner))
+      (course (unwrap! (map-get? courses course-id) err-not-found))
+    )
+    (asserts! (get active course) err-course-inactive)
+    (asserts! (and (>= hours-spent min-hours) (<= hours-spent max-hours)) err-invalid-input)
+    (map-set learning-records 
+      { learner: learner, course-id: course-id }
+      {
+        course-name: (get name course),
+        completion-date: stacks-block-height,
+        hours-spent: hours-spent,
+        verified: false
+      }
+    )
+    (map-set learner-stats learner
+      {
+        total-courses: (+ (get total-courses stats) u1),
+        total-hours: (+ (get total-hours stats) hours-spent),
+        tokens-earned: (+ (get tokens-earned stats) reward-amount)
+      }
+    )
+    (if (is-eq (get total-courses stats) u0)
+      (var-set total-learners (+ (var-get total-learners) u1))
+      true
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (verify-completion (learner principal) (course-id uint))
+  (let
+    (
+      (record (unwrap! (map-get? learning-records { learner: learner, course-id: course-id }) err-not-found))
+      (course (unwrap! (map-get? courses course-id) err-not-found))
+    )
+    (asserts! (is-eq tx-sender (get creator course)) err-unauthorized)
+    (map-set learning-records 
+      { learner: learner, course-id: course-id }
+      (merge record { verified: true })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (deactivate-course (course-id uint))
+  (let
+    (
+      (course (unwrap! (map-get? courses course-id) err-not-found))
+    )
+    (asserts! (is-eq tx-sender (get creator course)) err-unauthorized)
+    (map-set courses course-id
+      (merge course { active: false })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (reactivate-course (course-id uint))
+  (let
+    (
+      (course (unwrap! (map-get? courses course-id) err-not-found))
+    )
+    (asserts! (is-eq tx-sender (get creator course)) err-unauthorized)
+    (map-set courses course-id
+      (merge course { active: true })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (rate-course (course-id uint) (rating uint) (review (string-ascii 200)))
+  (let
+    (
+      (record (unwrap! (map-get? learning-records { learner: tx-sender, course-id: course-id }) err-not-found))
+    )
+    (asserts! (and (>= rating u1) (<= rating u5)) err-invalid-input)
+    (asserts! (get verified record) err-unauthorized)
+    (map-set course-ratings 
+      { learner: tx-sender, course-id: course-id }
+      {
+        rating: rating,
+        review: review
+      }
+    )
+    (ok true)
+  )
+)
