@@ -81,3 +81,70 @@
     creator: principal
   }
 )
+
+;; Read-only functions
+;; #[allow(unchecked_data)]
+(define-read-only (get-learning-record (learner principal) (course-id uint))
+  (map-get? learning-records { learner: learner, course-id: course-id })
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-learner-stats (learner principal))
+  (default-to 
+    { total-courses: u0, total-hours: u0, tokens-earned: u0 }
+    (map-get? learner-stats learner)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-course (course-id uint))
+  (map-get? courses course-id)
+)
+
+(define-read-only (get-course-nonce)
+  (var-get course-nonce)
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-achievement (achievement-id uint))
+  (map-get? achievements achievement-id)
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-learner-achievement (learner principal) (achievement-id uint))
+  (map-get? learner-achievements { learner: learner, achievement-id: achievement-id })
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-course-rating (learner principal) (course-id uint))
+  (map-get? course-ratings { learner: learner, course-id: course-id })
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (get-learning-path (path-id uint))
+  (map-get? learning-paths path-id)
+)
+
+(define-read-only (get-total-learners)
+  (var-get total-learners)
+)
+
+(define-read-only (get-achievement-nonce)
+  (var-get achievement-nonce)
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (is-course-active (course-id uint))
+  (match (map-get? courses course-id)
+    course (ok (get active course))
+    err-not-found
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-read-only (calculate-bonus-reward (hours uint))
+  (if (>= hours u50)
+    (ok bonus-reward)
+    (ok reward-amount)
+  )
+)
